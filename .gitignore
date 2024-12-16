@@ -1,0 +1,17 @@
+# Ignore the .build directory and everything under it
+.build/
+
+# Debug files
+*.dSYM/
+*.su
+*.idb
+*.pdb
+
+# Executables
+*.exe
+*.out
+*.app
+main
+
+# Object files
+*.o
