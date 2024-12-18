@@ -6,7 +6,15 @@
     - [執行程式前的步驟](#執行程式前的步驟)
     - [Link Error](#link-error)
     - [Header File](#header-file)
+    - [gcc 指令](#gcc-指令)
+    - [檔案類型](#檔案類型)
+      - [靜態庫](#靜態庫)
+      - [動態庫](#動態庫)
   - [Variable and Data Types](#variable-and-data-types)
+  - [Makefile 和 makefile.inc](#makefile-和-makefileinc)
+    - [語法](#語法)
+    - [makefile.inc](#makefileinc)
+    - [Makefile](#makefile)
 
 ## VScode Extension
 
@@ -122,6 +130,177 @@
   }
   ```
 
+### gcc 指令
+- `-o <執行檔名>`：指定輸出檔案名稱 (省略 `-o` 時預設為 `a.out`)
+  - ex : `gcc file.c -o program` -> 編譯 + 連結（預設行為）時的輸出
+  - ex : `gcc -c file.c -o file.o` -> 只編譯（-c）時的輸出
+  - ex : `gcc file.o -o program` -> 只連結物件檔時的輸出
+- `-c <filename.c>`：生成 `.o` 目標文件，不進行鏈接（Link）
+  - ex: `gcc -c filename.c`
+- `-Wall`: 啟用大多數警告
+  - ex: `gcc -Wall filename.c -o output` -> 編譯並連接
+  - ex: `gcc -Wall filename.o -o output` -> 直接連接
+  - ex: `gcc -Wall filename.c filename.o -o output` -> 部分編譯並連接,部分直接連接
+- `-I`: 指定標頭檔案的路徑
+  - ex: `gcc -I ./include -o main ./src/main.c`
+
+    ```
+    project/
+    ├── include/
+    │   ├── myheader.h
+    ├── src/
+    │   ├── main.c
+    ```
+### 檔案類型
+
+在 C 語言專案中，常見的重要檔案類型包括：
+
+| 檔案類型 | 副檔名                                    | 描述                                                                   |
+| -------- | ----------------------------------------- | ---------------------------------------------------------------------- |
+| 源代碼檔 | .c                                        | 包含 C 語言撰寫的源代碼，是程式的主要部分。                            |
+| 標頭檔   | .h                                        | 包含函數原型、宏定義、結構體定義等，用於在多個源代碼檔之間共享資訊。   |
+| 物件檔   | .o                                        | 經過編譯器編譯後生成的中間檔案，每個 .c 檔案通常對應一個 .o 檔。       |
+| 靜態庫   | .a（Unix/Linux）<br>.lib（Windows）       | 包含多個物件檔（.o 檔），通過 ar 工具打包，用於靜態鏈結。              |
+| 動態庫   | .so（Unix/Linux）<br>.dll（Windows）      | 動態共享庫，在運行時被載入使用。                                       |
+| 可執行檔 | 無副檔名（Unix/Linux）<br>.exe（Windows） | 最終生成的可執行程式。                                                 |
+| Makefile | Makefile                                  | 定義編譯和建構規則的文件，指導 Make 工具如何編譯和連結程式。           |
+| 包含檔   | makefile.inc（或其他名稱）                | 包含共用變數和規則的 Makefile 包含檔，用於模組化和重用 Makefile 規則。 |
+
+#### 靜態庫
+
+- 當您需要生成獨立的可執行檔，無需外部依賴。
+- 當專案較小，且不需要頻繁更新庫。
+- 當您希望簡化部署和分發過程。
+- ex:
+  1. 建立靜態庫
+       - 編譯源文件為物件檔
+         ```sh
+         gcc -c utils.c -o utils.o
+         gcc -c helpers.c -o helpers.o
+         ```
+
+       - 打包物件檔成靜態庫
+
+         ```sh
+         ar -rs libutils.a utils.o helpers.o
+         ```
+
+  2. 使用靜態庫
+
+      ```sh
+      gcc -o myprogram main.c -L. -lutils
+      ```
+
+#### 動態庫
+- 當多個應用程式需要使用相同的庫，通過共享動態庫來節省系統資源。
+- 當庫需要頻繁更新，而不希望重新編譯所有依賴的應用程式。
+- 當專案規模較大，且需要靈活的模組化設計。
+- ex:
+  1. 建立動態庫
+       - 編譯源文件為位置無關的物件檔
+         ```sh
+         gcc -fPIC -c utils.c -o utils.o
+         gcc -fPIC -c helpers.c -o helpers.o
+         ```
+
+       - 打包物件檔成動態庫
+
+         ```sh
+         gcc -shared -o libutils.so utils.o helpers.o
+         ```
+
+  2. 使用動態庫
+
+      ```sh
+      gcc -o myprogram main.c -L. -lutils
+      ```
+  - 並確保動態庫在運行時的搜索路徑中
+
+      ```sh
+      export LD_LIBRARY_PATH=.:$LD_LIBRARY_PATH
+      ./myprogram
+      ```
+
 ## Variable and Data Types
 
 - [2. Variable and Data Types](2.%20variable_and_data_types/README.md)
+
+## Makefile 和 makefile.inc
+
+### 語法
+- Makefile 和 makefile.inc 的語法是相同的
+- 一個基本的 Makefile 包含以下幾個部分：
+  - `變數定義`：使用 `:=` 來定義變數。
+  - `目標`（Targets）：要生成的檔案，如可執行檔或庫檔。
+  - `依賴`（Dependencies）：目標檔案所依賴的源文件或其他目標。
+  - `命令`（Commands）：生成目標所需執行的命令。
+- `依賴` 都執行完，才會執行 `命令`
+- `.PHONY` 目標是特殊命令而不是實際的文件目標 (下面範例可用 `make clean` 清除目標)
+- `make` 命令的預設目標是第一個目標
+- 相關函數
+  - `wildcard <pattern>`: 用於匹配多個文件
+  - `patsubst <pattern> <replacement> <text>`: 與 `<pattern>` 相符的 `<text>` 並將其替換為 `<replacement>`
+- 自動變數
+  - `$@`: 目標檔案
+  - `$<`: 第一個依賴檔案（來源檔案）
+  - `$^`: 所有依賴檔案
+- 後綴規則（suffix rules）：用來定義特定後綴的檔案之間如何轉換的規則，是一種較舊的寫法，現在多數情況會使用更靈活的模式規則（pattern rules）替代
+  - ex:
+    ```makefile
+    # 同 .c.o: (suffix rules)
+    # 以下是 pattern rules
+    %.o: %.c
+        gcc -c $< -o $@
+    ```
+### makefile.inc
+
+- 同樣是 Makefile，只是用於存放專案中多個 Makefile 可能會共用的變數和規則。這樣的設計有助於模組化和重用，減少重複代碼，並使 Makefile 更易於維護和管理。
+- 在 `Makefile` 中引用 `makefile.inc` 檔案，以便在多個 Makefile 中共用相同的變數和規則。
+
+```makefile
+# 搜集所有 .c 檔案
+SOURCE  := $(wildcard *.c)
+# 將 .c 檔案轉換為 .o 檔案（不會直接編譯，而是名稱列表）
+OBJS    := $(patsubst %.c, %.o, $(SOURCE))
+# 變數定義
+CC := gcc
+CFLAGS := -Wall -Wno-strict-aliasing -Wno-uninitialized -g -rdynamic -std=gnu99
+LFLAGS := -g -rdynamic
+
+# 虛擬目標
+.PHONY: all clean install
+
+# 預設目標
+all: $(TARGET)
+
+# 清理目標
+clean:
+	rm -rf *.d *.o $(TARGET)
+
+# 生成目標
+$(TARGET): $(OBJS)
+	$(CC) $(LFLAGS) -o $@ $(OBJS) $(LIBS)
+
+# 後綴規則，當 make 確定需要從某個 .c 檔案生成對應的 .o 檔案時(執行 OBJS 中 patsubst 時 )，會執行這條規則，也就是從 .c 編譯到 .o ($<：即 .c 檔案）
+.c.o:
+  # 同 `$(CC) $(CFLAGS) -c $< -o $@ $(INCS)`
+	$(CC) $(CFLAGS) -c -o $@ $< $(INCS)
+
+# 安裝目標（留空，具體在主 Makefile 中定義）
+install:
+```
+
+### Makefile
+
+```makefile
+TARGET  := target.a
+INCS = -I ../network
+include ../makefile.inc
+# 覆寫 makefile.inc
+$(TARGET) : $(OBJS)
+  # 使用 ar 工具打包物件檔成靜態庫( $@ 是 $(TARGET) 代表目標, $^ 是 $(OBJS) 代表所有依賴)
+  # -r：（Replace or Insert） 如果檔案已存在於靜態庫中，則用新版本替換，否則則插入新的檔案
+  # -s：（Create or Update Symbol Table） 確保靜態庫在修改後的符號表是最新的
+	ar -rs $@ $^
+
+```
