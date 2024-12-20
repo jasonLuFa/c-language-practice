@@ -10,11 +10,14 @@
     - [檔案類型](#檔案類型)
       - [靜態庫](#靜態庫)
       - [動態庫](#動態庫)
+      - [依賴檔](#依賴檔)
   - [Variable and Data Types](#variable-and-data-types)
   - [Makefile 和 makefile.inc](#makefile-和-makefileinc)
     - [語法](#語法)
     - [makefile.inc](#makefileinc)
     - [Makefile](#makefile)
+  - [Pointer](#pointer)
+  - [const](#const)
 
 ## VScode Extension
 
@@ -34,7 +37,7 @@
   1. **預處理（preprocessing）**：預處理器處理 `#include` 和 `#define` 等 `#` 開頭的指令，移除所有註解，並生成 .i 檔案。
   2. **編譯（compiling）**：將預處理後的程式碼轉換為組合語言，生成 .s 檔案。
   3. **組譯（assembling）**：將 .s 檔案轉換為目標檔案 .o。
-  4. **連結（linking）**：將 .o 目標檔案和必要的標準函式庫連結，生成最終的可執行檔案 main。
+  4. **連結（linking）**：連結器 (linker) 將 .o 目標檔案和必要的標準函式庫連結，生成最終的可執行檔案 main。
 
 - 這些中間檔案（.i、.s）不會保留，因為 GCC 預設會在完成後刪除這些檔案以節省空間，並僅保留 .o 和可執行檔案。
 
@@ -153,6 +156,10 @@
     │   ├── main.c
     ```
 
+- `-L`：定義庫的搜尋順序，連結器將使用它找到的第一個匹配項
+- `-Wl,-Bstatic -l<庫名稱> -l<庫名稱>`：靜態連結（Static Link）（將庫文件包含在執行檔案中），靜態庫（.a 檔）
+- `-Wl,-Bdynamic -l<庫名稱> -l<庫名稱>`：動態連結（Dynamic Link）（將庫文件包含在執行檔案中），動態庫（.so 檔）
+
 ### 檔案類型
 
 在 C 語言專案中，常見的重要檔案類型包括：
@@ -167,6 +174,7 @@
 | 可執行檔 | 無副檔名（Unix/Linux）</br>.exe（Windows） | 最終生成的可執行程式。                                                 |
 | Makefile | Makefile                                  | 定義編譯和建構規則的文件，指導 Make 工具如何編譯和連結程式。           |
 | 包含檔   | makefile.inc（或其他名稱）                | 包含共用變數和規則的 Makefile 包含檔，用於模組化和重用 Makefile 規則。 |
+| 依賴檔   | .d   | 記錄了每個源文件（.c 檔案）所依賴的標頭文件（.h 檔案）的關係，用於自動化管理依賴關係。 |
 
 #### 靜態庫
 
@@ -227,6 +235,16 @@
       ./myprogram
       ```
 
+#### 依賴檔
+
+- 自動化依賴管理：.d 檔案通過自動記錄這些依賴關係，幫助 Make 系統正確決定哪些文件需要重新編譯
+- 減少手動維護，提高編譯效率：透過 .d 檔案，Make 只會重新編譯那些實際受影響的源文件，而不會重複編譯所有文件，從而節省編譯時間
+- ex:
+  - `gcc -Wall -Wno-strict-aliasing -Wno-uninitialized -g -rdynamic -std=gnu99 -MMD -MF utils.d -c utils.c -I ../network`
+    - `-MMD`：生成依賴檔案，但不包含系統標頭文件的依賴。
+    - `-MF utils.d`：指定依賴檔案的名稱為 utils.d。
+    - `-I ../network`：指定標頭文件(.h)的搜索路徑。
+
 ## Variable and Data Types
 
 - [Variable and Basic Data Types](variable_and_basic_data_types/README.md)
@@ -237,13 +255,34 @@
 
 - Makefile 和 makefile.inc 的語法是相同的
 - 一個基本的 Makefile 包含以下幾個部分：
-  - `變數定義`：使用 `:=` 來定義變數。
-  - `目標`（Targets）：要生成的檔案，如可執行檔或庫檔。
-  - `依賴`（Dependencies）：目標檔案所依賴的源文件或其他目標。
-  - `命令`（Commands）：生成目標所需執行的命令。
-- `依賴` 都執行完，才會執行 `命令`
-- `.PHONY` 目標是特殊命令而不是實際的文件目標 (下面範例可用 `make clean` 清除目標)
+  - **變數定義**：使用 `:=` 來定義變數。
+  - **目標**（Targets）：要生成的檔案，如可執行檔或庫檔。
+  - **依賴**（Dependencies）：目標檔案所依賴的源文件或其他目標。
+  - **命令**（Commands）：生成目標所需執行的命令。
+- **依賴** 都執行完，才會執行 **命令**
+- **.PHONY** 目標是特殊命令而不是實際的文件目標 (下面範例可用 `make clean` 清除目標)
+- **include** 指定要包含的檔案， **-include** 同 **include** 但，檔案不在時不會報錯
+  - ex:
+
+    ```makefile
+    include makefile.inc
+    ```
+
+    ```makefile
+    # 創建 obj 目錄
+    OBJ_DIR = obj
+
+    # 獲取所有 .c 文件
+    SRCS = $(wildcard *.c)
+    OBJS = $(SRCS:%.c=$(OBJ_DIR)/%.o)
+
+    # 添加 .h 文件依赖
+    DEPS = $(OBJS:.o=.d)
+    -include $(DEPS)
+    ```
+
 - `make` 命令的預設目標是第一個目標
+- `$(shell <linux 命令>)`: 執行 shell 命令，會在執行任何指令前執行
 - 相關函數
   - `wildcard <pattern>`: 用於匹配多個文件
   - `patsubst <pattern> <replacement> <text>`: 與 `<pattern>` 相符的 `<text>` 並將其替換為 `<replacement>`
@@ -313,5 +352,49 @@ $(TARGET) : $(OBJS)
   # -r：（Replace or Insert） 如果檔案已存在於靜態庫中，則用新版本替換，否則則插入新的檔案
   # -s：（Create or Update Symbol Table） 確保靜態庫在修改後的符號表是最新的
   ar -rs $@ $^
+```
 
+## Pointer
+
+- 指標的定義：指標是一種變數，用於存儲其他變數的記憶體地址
+- 指標操作符
+  - `&`：取得變數的地址。
+  - `*`：訪問指標指向的記憶體地址中的值
+
+    ```c
+    int x = 10;
+    int *p = &x; // p 是一個指向 x 的指標
+    ```
+
+- `int *p1 = NULL;` 同 `int *p2 = 0;` 都是初始化，但前者較有可讀性
+
+## const
+
+| 變數宣告 | 指針可修改？ | 值可修改？ | 是否需要初始化？ |
+|------|------------|-----------|----------------|
+| const int *a | 是 | 否 | 否，但建議初始化為 NULL 如果尚未有可用的地址。若未初始化就解引用指針，會導致未定義行為，可能引發程式崩潰、記憶體損壞或不預期的結果。 |
+| int *const b | 否 | 是 | 是，因為指針不可改變，因此必須在宣告時初始化。 |
+| const int *const c | 否 | 否 | 是，因為指針和指向的值都不可改變，因此必須在宣告時初始化。 |
+
+範例：
+
+```c
+const int *a = NULL; // Safe initialization
+int x = 10;
+a = &x; // Assign a valid address
+printf("%d\n", *a); // Valid: prints 10
+```
+
+```c
+int x = 20;
+int *const b = &x; // Must initialize b
+*b = 30; // Valid: modify the value at b
+b = NULL; // Error: cannot change the address stored in b
+```
+
+```c
+const int x = 40;
+const int *const c = &x; // Must initialize c
+*c = 50; // Error: cannot modify the value pointed to by c
+c = NULL; // Error: cannot change the address stored in c
 ```
