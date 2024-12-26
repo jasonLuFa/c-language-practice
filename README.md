@@ -17,6 +17,9 @@
     - [makefile.inc](#makefileinc)
     - [Makefile](#makefile)
   - [Pointer](#pointer)
+  - [Function](#function)
+    - [Function Pointer](#function-pointer)
+    - [Normal Function](#normal-function)
   - [const](#const)
 
 ## VScode Extension
@@ -367,6 +370,65 @@ $(TARGET) : $(OBJS)
     ```
 
 - `int *p1 = NULL;` 同 `int *p2 = 0;` 都是初始化，但前者較有可讀性
+
+## Function
+
+### Function Pointer
+
+- 用途: 用於需要 **自定義邏輯** 或 **動態行為** 的場景，尤其是當操作的數據類型（例如 key、value）可能根據需求而變化時。
+- 特點:
+  - **動態行為**: 可以在運行時決定具體執行的函數。
+  - **靈活性**: 可用於不同類型的數據結構，無需修改核心邏輯。
+  - **可插拔**: 通過指向不同函數，實現對應的行為。
+- 適用場合:
+  - 哈希函數、自定義比較、複製或銷毀對象等需要針對特定類型的實現。
+
+    ```c
+    typedef struct dict_entry {
+      void *key;
+      void *val;
+      uint64_t id;
+      struct dict_entry *next;  // 必須使用 struct，因為 dict_entry 尚未完成定義
+    } dict_entry;
+
+    typedef struct dict_types {
+        uint32_t (*hash_function)(const void *key);
+        void *(*key_dup)(const void *key); // key_dup 是 function pointer，並回傳一個指向 void (任何型別)的指標
+        void *(*val_dup)(const void *val);
+        int (*key_compare)(const void *key1, const void *key2);
+        void (*key_destructor)(void *key);
+        void (*val_destructor)(void *val);
+    } dict_types;
+
+    typedef struct dict_t {
+      dict_entry **table;
+      dict_types type;
+      uint32_t size;
+      uint32_t mask;
+      uint32_t used;
+      uint64_t id_start;
+      uint64_t id_clear;
+    } dict_t;
+    ```
+
+### Normal Function
+
+- 用途: 處理核心業務邏輯，這些邏輯與具體數據類型無關。
+- 特點:
+  - **固定行為**: 適用於所有場景的通用操作。
+  - **結構化**: 實現數據結構的基本功能，例如初始化、添加、查找等操作。
+- 適用場合:
+  - 操作固定數據結構的功能，例如創建字典、添加條目、查找條目等。
+
+    ```c
+    dict_t *dict_create(dict_types *type, uint32_t init_size); // dict_craate 是 noraml function，並回傳一個指向 dict_t 的指標
+    dict_entry *dict_add(dict_t *dt, void *key, void *val);
+    dict_entry *dict_find(dict_t *dt, const void *key);
+    int dict_expand(dict_t *dt, uint32_t size);
+    int dict_replace(dict_t *dt, void *key, void *val);
+    int dict_delete(dict_t *dt, const void *key);
+    void dict_release(dict_t *dt);
+    ```
 
 ## const
 
